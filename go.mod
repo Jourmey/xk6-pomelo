@@ -1,4 +1,4 @@
-module xk6-pomelo
+module github.com/Jourmey/xk6-pomelo
 
 go 1.19
 

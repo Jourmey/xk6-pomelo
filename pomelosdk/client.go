@@ -1,7 +1,7 @@
 package pomelosdk
 
 import (
-	"xk6-pomelo/pomelosdk/codec"
+	"github.com/Jourmey/xk6-pomelo/pomelosdk/codec"
 )
 
 // Callback represents the callback type which will be called

@@ -2,7 +2,7 @@ package codec
 
 import (
 	"bytes"
-	"xk6-pomelo/pomelosdk/packet"
+	"github.com/Jourmey/xk6-pomelo/pomelosdk/packet"
 )
 
 // NewDecoder -- returns a new decoder that used for decode network bytes slice.

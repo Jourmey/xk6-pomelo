@@ -9,10 +9,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Jourmey/xk6-pomelo/pomelosdk/codec"
+	"github.com/Jourmey/xk6-pomelo/pomelosdk/message"
+	"github.com/Jourmey/xk6-pomelo/pomelosdk/packet"
 	"github.com/gorilla/websocket"
-	"xk6-pomelo/pomelosdk/codec"
-	"xk6-pomelo/pomelosdk/message"
-	"xk6-pomelo/pomelosdk/packet"
 )
 
 type (
