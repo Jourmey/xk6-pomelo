@@ -430,7 +430,7 @@ func (c *Connector) processMessage(msg *message.Message) {
 			log.Println("event handler not found", msg.Route, msg, c.events)
 			return
 		}
-		cb(msg.Data)
+		cb(string(msg.Data))
 
 	case message.Response:
 		cb, ok := c.responseHandler(msg.ID)
@@ -439,7 +439,7 @@ func (c *Connector) processMessage(msg *message.Message) {
 			return
 		}
 
-		cb(msg.Data)
+		cb(string(msg.Data))
 		c.setResponseHandler(msg.ID, nil)
 	}
 }

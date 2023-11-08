@@ -6,7 +6,7 @@ import (
 
 // Callback represents the callback type which will be called
 // when the correspond events is occurred.
-type Callback func(data []byte)
+type Callback func(data string)
 
 // NewConnector create a new Connector
 func NewConnector() *Connector {
