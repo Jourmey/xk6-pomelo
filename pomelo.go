@@ -1,11 +1,11 @@
 package pomelo
 
 import (
-	"errors"
 	"go.k6.io/k6/lib"
 	"log"
 	"math/rand"
 	"strconv"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -25,18 +25,6 @@ type (
 	Instance struct {
 		vu  modules.VU
 		obj *goja.Object
-	}
-
-	Client struct {
-		vu  modules.VU
-		obj *goja.Object
-
-		connectArgs ConnectArgs
-
-		chatConnectorConnected bool
-		chatConnector          *pomelosdk.Connector
-		chatReqId              *uint64
-		chatAckReqId           *uint64
 	}
 )
 
@@ -66,20 +54,24 @@ type ConnectArgs struct {
 	chatAddress string
 }
 
+type ConnectResponse struct {
+	Status int          `json:"status"`
+	Client *goja.Object `json:"client"`
+	Error  string       `json:"error"`
+}
+
 // Exports returns the exports of the ws module.
 func (mi *Instance) Exports() modules.Exports {
 	return modules.Exports{Default: mi.obj}
 }
 
-func (mi *Instance) Connect(args goja.Value) (client *goja.Object, err error) {
+func (mi *Instance) Connect(args goja.Value) (response *ConnectResponse, err error) {
 	ctx := mi.vu.Context()
 	rt := mi.vu.Runtime()
 	state := mi.vu.State()
 	if state == nil {
-		return nil, errors.New("invalid state")
+		return &ConnectResponse{Error: "invalid state"}, nil
 	}
-
-	log.Println("pomelo.connect starting, arg:", args)
 
 	parsedArgs, err := parseConnectArgs(state, rt, args)
 	if err != nil {
@@ -95,6 +87,8 @@ func (mi *Instance) Connect(args goja.Value) (client *goja.Object, err error) {
 	cl := &Client{
 		vu:                     mi.vu,
 		obj:                    rt.NewObject(),
+		RWMutex:                sync.RWMutex{},
+		events:                 map[string]pomelosdk.Callback{},
 		connectArgs:            parsedArgs,
 		chatConnectorConnected: false,
 		chatConnector:          connector,
@@ -104,8 +98,11 @@ func (mi *Instance) Connect(args goja.Value) (client *goja.Object, err error) {
 
 	err = runAndWaitConnect(ctx, connector, parsedArgs.chatAddress, 10*time.Second)
 	if err != nil {
-		return nil, err
+		return &ConnectResponse{Error: err.Error()}, nil
 	}
+
+	// 监听ack回复
+	cl.onEvent()
 
 	uniqId := rand.Int()
 
@@ -120,7 +117,7 @@ func (mi *Instance) Connect(args goja.Value) (client *goja.Object, err error) {
 		Ulevel:       1,
 		Classid:      cl.connectArgs.roomId,
 		Mtcv:         "0.0.1",
-		Pv:           "1.1",
+		Pv:           "1.0",
 		UniqId:       strconv.Itoa(uniqId),
 		InteractMode: 1,
 		LiveType:     1,
@@ -130,13 +127,11 @@ func (mi *Instance) Connect(args goja.Value) (client *goja.Object, err error) {
 
 	err = syncRequest(ctx, connector, 30*time.Second, cl.chatReqId, ROUTE_Connector_EntryHandler_Enter, request, nil)
 	if err != nil {
-		return nil, err
+		return &ConnectResponse{Error: err.Error()}, nil
 	}
 
 	log.Println("pomelo.connect success, arg:", parsedArgs)
 
-	// 监听ack回复
-	cl.onEvent()
 	cl.chatConnectorConnected = true
 	if err := cl.obj.Set("request", cl.Request); err != nil {
 		common.Throw(rt, err)
@@ -144,8 +139,16 @@ func (mi *Instance) Connect(args goja.Value) (client *goja.Object, err error) {
 	if err := cl.obj.Set("close", cl.Close); err != nil {
 		common.Throw(rt, err)
 	}
+	if err := cl.obj.Set("on", cl.On); err != nil {
+		common.Throw(rt, err)
+	}
 
-	return cl.obj, nil
+	return &ConnectResponse{
+		Status: 200,
+		Client: cl.obj,
+		Error:  "success",
+	}, nil
+
 }
 
 //nolint:gocognit

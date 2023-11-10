@@ -386,7 +386,7 @@ func (c *Connector) read(tickrate int64) error {
 }
 
 func (c *Connector) processPacket(p *packet.Packet) {
-	// log.Printf("packet: %+v\n", p)
+	//log.Printf("packet: %+v\n", p)
 	switch p.Type {
 	case packet.Handshake:
 		var handshakeResp DefaultHandshakePacket
@@ -412,6 +412,7 @@ func (c *Connector) processPacket(p *packet.Packet) {
 	case packet.Data:
 		msg, err := message.Decode(p.Data)
 		if err != nil {
+			log.Println(" message.Decode failed,err:", err.Error())
 			return
 		}
 		c.processMessage(msg)

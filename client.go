@@ -6,12 +6,31 @@ import (
 	"errors"
 	"fmt"
 	"github.com/Jourmey/xk6-pomelo/pomelosdk"
+	"github.com/dop251/goja"
 	"github.com/zeromicro/go-zero/core/jsonx"
 	"github.com/zeromicro/go-zero/core/syncx"
+	"go.k6.io/k6/js/modules"
 	"log"
+	"sync"
 	"sync/atomic"
 	"time"
 )
+
+type Client struct {
+	vu  modules.VU
+	obj *goja.Object
+
+	// events handler
+	sync.RWMutex
+	events map[string]pomelosdk.Callback
+
+	connectArgs ConnectArgs
+
+	chatConnectorConnected bool
+	chatConnector          *pomelosdk.Connector
+	chatReqId              *uint64
+	chatAckReqId           *uint64
+}
 
 func (c *Client) Request(route string, data []byte, callback pomelosdk.Callback) error {
 	if c.chatConnectorConnected == false {
@@ -24,11 +43,11 @@ func (c *Client) Request(route string, data []byte, callback pomelosdk.Callback)
 // asyncRequest 异步简单发送消息
 func (c *Client) asyncRequest(connector *pomelosdk.Connector, reqId *uint64, route string, sendData []byte, cb pomelosdk.Callback) error {
 
-	id := atomic.LoadUint64(reqId)
+	//id := atomic.LoadUint64(reqId)
 
 	err := connector.Request(route, sendData, func(data string) {
 
-		log.Println(fmt.Sprintf("[%s][%d] %d - %s -- callback success, response.data: %s ", c.connectArgs.uid, c.connectArgs.channelId, id, route, string(data)))
+		//log.Println(fmt.Sprintf("[%s][%d] %d - %s -- callback success, response.data: %s ", c.connectArgs.uid, c.connectArgs.channelId, id, route, string(data)))
 
 		if cb != nil {
 			cb(data)
@@ -39,7 +58,7 @@ func (c *Client) asyncRequest(connector *pomelosdk.Connector, reqId *uint64, rou
 	// 增加发送序号
 	atomic.AddUint64(reqId, 1)
 
-	log.Println(fmt.Sprintf("[%s][%d] %d - %s -- request success, request: %s ", c.connectArgs.uid, c.connectArgs.channelId, id, route, string(sendData)))
+	//log.Println(fmt.Sprintf("[%s][%d] %d - %s -- request success, request: %s ", c.connectArgs.uid, c.connectArgs.channelId, id, route, string(sendData)))
 
 	return err
 }
@@ -49,6 +68,14 @@ func (c *Client) Close() {
 	if c.chatConnectorConnected {
 		c.chatConnector.Close()
 	}
+}
+
+// On add the callback for the event
+func (c *Client) On(event string, callback pomelosdk.Callback) {
+	c.Lock()
+	defer c.Unlock()
+
+	c.events[event] = callback
 }
 
 // 事件监听
@@ -90,26 +117,54 @@ func (c *Client) onEvent() {
 		//log.Println(fmt.Sprintf("[%s][%d] onServer,data: %s", c.connectArgs.uid, c.connectArgs.channelId, string(data)))
 
 		ack(data)
+
+		cb, ok := c.eventHandler(Event_OnServer)
+		if ok && cb != nil {
+			go cb(data)
+		}
 	})
 
 	c.chatConnector.On(Event_OnAdd, func(data string) {
 		//log.Println(fmt.Sprintf("[%s][%d] onAdd,data: %s", c.connectArgs.uid, c.connectArgs.channelId, string(data)))
 
 		ack(data)
+
+		cb, ok := c.eventHandler(Event_OnAdd)
+		if ok && cb != nil {
+			go cb(data)
+		}
 	})
 
 	c.chatConnector.On(Event_OnLeave, func(data string) {
 		//log.Println(fmt.Sprintf("[%s][%d] onLeave,data: %s", c.connectArgs.uid, c.connectArgs.channelId, string(data)))
 
 		ack(data)
+
+		cb, ok := c.eventHandler(Event_OnLeave)
+		if ok && cb != nil {
+			go cb(data)
+		}
 	})
 
 	c.chatConnector.On(Event_OnChat, func(data string) {
 		//log.Println(fmt.Sprintf("[%s][%d] onChat,duration: null ,data: %s", c.connectArgs.uid, c.connectArgs.channelId, string(data)))
 
 		ack(data)
+
+		cb, ok := c.eventHandler(Event_OnChat)
+		if ok && cb != nil {
+			go cb(data)
+		}
 	})
 
+}
+
+func (c *Client) eventHandler(event string) (pomelosdk.Callback, bool) {
+	c.RLock()
+	defer c.RUnlock()
+
+	cb, ok := c.events[event]
+	return cb, ok
 }
 
 // runAndWaitConnect Connector 初始化握手信息和保持连接
