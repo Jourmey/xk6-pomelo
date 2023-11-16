@@ -5,8 +5,6 @@ const (
 	ROUTE_GATE                         = "gate.gateHandler.queryEntry"
 	ROUTE_Connector_EntryHandler_Enter = "connector.entryHandler.enter"
 	ROUTE_Chat_ChatHandler_Send        = "chat.chatHandler.send"
-
-	ROUTE_ACK = "ack"
 )
 
 const (

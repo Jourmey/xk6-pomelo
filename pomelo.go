@@ -78,17 +78,17 @@ func (mi *Instance) Connect(args goja.Value) (response *ConnectResponse, err err
 		return nil, err
 	}
 
-	log.Println("pomelo.connect.parseConnectArgs , parsedArgs:", parsedArgs)
+	//log.Println("pomelo.connect.parseConnectArgs , parsedArgs:", parsedArgs)
 
 	//parsedArgs.tagsAndMeta.SetSystemTagOrMetaIfEnabled(state.Options.SystemTags, metrics.TagURL, url)
 
 	connector := pomelosdk.NewConnector()
 
 	cl := &Client{
-		vu:                     mi.vu,
-		obj:                    rt.NewObject(),
-		RWMutex:                sync.RWMutex{},
-		events:                 map[string]pomelosdk.Callback{},
+		vu:      mi.vu,
+		obj:     rt.NewObject(),
+		RWMutex: sync.RWMutex{},
+		//events:                 map[string]pomelosdk.Callback{},
 		connectArgs:            parsedArgs,
 		chatConnectorConnected: false,
 		chatConnector:          connector,
@@ -100,9 +100,6 @@ func (mi *Instance) Connect(args goja.Value) (response *ConnectResponse, err err
 	if err != nil {
 		return &ConnectResponse{Error: err.Error()}, nil
 	}
-
-	// 监听ack回复
-	cl.onEvent()
 
 	uniqId := rand.Int()
 

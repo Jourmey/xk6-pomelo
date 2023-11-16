@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"github.com/zeromicro/go-zero/core/threading"
 	"log"
 	"strings"
 	"sync"
@@ -13,6 +15,10 @@ import (
 	"github.com/Jourmey/xk6-pomelo/pomelosdk/message"
 	"github.com/Jourmey/xk6-pomelo/pomelosdk/packet"
 	"github.com/gorilla/websocket"
+)
+
+const (
+	ROUTE_ACK = "ack"
 )
 
 type (
@@ -426,12 +432,11 @@ func (c *Connector) processPacket(p *packet.Packet) {
 func (c *Connector) processMessage(msg *message.Message) {
 	switch msg.Type {
 	case message.Push:
-		cb, ok := c.eventHandler(msg.Route)
-		if !ok {
-			log.Println("event handler not found", msg.Route, msg, c.events)
-			return
-		}
-		cb(string(msg.Data))
+		// 改造点 回复ack
+		c.ack(msg.Data)
+
+		// 触发event事件
+		c.event(msg)
 
 	case message.Response:
 		cb, ok := c.responseHandler(msg.ID)
@@ -443,4 +448,48 @@ func (c *Connector) processMessage(msg *message.Message) {
 		cb(string(msg.Data))
 		c.setResponseHandler(msg.ID, nil)
 	}
+}
+
+type callbackMessage struct {
+	MsgId     int    `json:"msgId"`
+	OnlineNum uint64 `json:"onlineNum"`
+}
+
+type eventAck struct {
+	Ack   int `json:"ack"`
+	MsgId int `json:"msgId"`
+}
+
+func (c *Connector) ack(data []byte) {
+	var cme callbackMessage
+	if err := json.Unmarshal([]byte(data), &cme); err != nil {
+		log.Println(fmt.Sprintf("ack data unmarshal failed,data: %s", string(data)))
+	}
+
+	ack := eventAck{
+		Ack:   1,
+		MsgId: cme.MsgId,
+	}
+
+	requestBytes, err := json.Marshal(ack)
+	if err != nil {
+		return
+	}
+
+	err = c.Request(ROUTE_ACK, requestBytes, nil)
+	if err != nil {
+		log.Println(fmt.Sprintf("ack request failed,data: %s", string(data)))
+	}
+}
+
+func (c *Connector) event(msg *message.Message) {
+	cb, ok := c.eventHandler(msg.Route)
+	if !ok {
+		log.Println("event handler not found", msg.Route, msg, c.events)
+		return
+	}
+
+	threading.GoSafe(func() {
+		cb(string(msg.Data))
+	})
 }

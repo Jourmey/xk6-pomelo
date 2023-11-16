@@ -4,13 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"github.com/Jourmey/xk6-pomelo/pomelosdk"
 	"github.com/dop251/goja"
 	"github.com/zeromicro/go-zero/core/jsonx"
 	"github.com/zeromicro/go-zero/core/syncx"
 	"go.k6.io/k6/js/modules"
-	"log"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -22,7 +20,6 @@ type Client struct {
 
 	// events handler
 	sync.RWMutex
-	events map[string]pomelosdk.Callback
 
 	connectArgs ConnectArgs
 
@@ -72,99 +69,7 @@ func (c *Client) Close() {
 
 // On add the callback for the event
 func (c *Client) On(event string, callback pomelosdk.Callback) {
-	c.Lock()
-	defer c.Unlock()
-
-	c.events[event] = callback
-}
-
-// 事件监听
-func (c *Client) onEvent() {
-
-	type callbackMessage struct {
-		MsgId     int    `json:"msgId"`
-		OnlineNum uint64 `json:"onlineNum"`
-	}
-
-	type eventAck struct {
-		Ack   int `json:"ack"`
-		MsgId int `json:"msgId"`
-	}
-
-	ack := func(data string) {
-		var cme callbackMessage
-		if err := json.Unmarshal([]byte(data), &cme); err != nil {
-			log.Println(fmt.Sprintf("[%s][%d] OnServer,data: %s", c.connectArgs.uid, c.connectArgs.channelId, string(data)))
-		}
-
-		ack := eventAck{
-			Ack:   1,
-			MsgId: cme.MsgId,
-		}
-
-		requestBytes, err := json.Marshal(ack)
-		if err != nil {
-			return
-		}
-
-		err = c.asyncRequest(c.chatConnector, c.chatAckReqId, ROUTE_ACK, requestBytes, nil)
-		if err != nil {
-			log.Println(fmt.Sprintf("[%s][%d] asyncRequest failed: %s", c.connectArgs.uid, c.connectArgs.channelId, err))
-		}
-	}
-
-	c.chatConnector.On(Event_OnServer, func(data string) {
-		//log.Println(fmt.Sprintf("[%s][%d] onServer,data: %s", c.connectArgs.uid, c.connectArgs.channelId, string(data)))
-
-		ack(data)
-
-		cb, ok := c.eventHandler(Event_OnServer)
-		if ok && cb != nil {
-			go cb(data)
-		}
-	})
-
-	c.chatConnector.On(Event_OnAdd, func(data string) {
-		//log.Println(fmt.Sprintf("[%s][%d] onAdd,data: %s", c.connectArgs.uid, c.connectArgs.channelId, string(data)))
-
-		ack(data)
-
-		cb, ok := c.eventHandler(Event_OnAdd)
-		if ok && cb != nil {
-			go cb(data)
-		}
-	})
-
-	c.chatConnector.On(Event_OnLeave, func(data string) {
-		//log.Println(fmt.Sprintf("[%s][%d] onLeave,data: %s", c.connectArgs.uid, c.connectArgs.channelId, string(data)))
-
-		ack(data)
-
-		cb, ok := c.eventHandler(Event_OnLeave)
-		if ok && cb != nil {
-			go cb(data)
-		}
-	})
-
-	c.chatConnector.On(Event_OnChat, func(data string) {
-		//log.Println(fmt.Sprintf("[%s][%d] onChat,duration: null ,data: %s", c.connectArgs.uid, c.connectArgs.channelId, string(data)))
-
-		ack(data)
-
-		cb, ok := c.eventHandler(Event_OnChat)
-		if ok && cb != nil {
-			go cb(data)
-		}
-	})
-
-}
-
-func (c *Client) eventHandler(event string) (pomelosdk.Callback, bool) {
-	c.RLock()
-	defer c.RUnlock()
-
-	cb, ok := c.events[event]
-	return cb, ok
+	c.chatConnector.On(event, callback)
 }
 
 // runAndWaitConnect Connector 初始化握手信息和保持连接
