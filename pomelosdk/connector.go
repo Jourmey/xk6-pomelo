@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/zeromicro/go-zero/core/threading"
 	"log"
 	"strings"
 	"sync"
@@ -24,6 +23,7 @@ const (
 type (
 	// Connector is a Amoeba [nano] client
 	Connector struct {
+		uid               string
 		conn              *websocket.Conn // low-level connection
 		codec             *codec.Decoder  // decoder
 		mid               uint            // message id
@@ -485,11 +485,20 @@ func (c *Connector) ack(data []byte) {
 func (c *Connector) event(msg *message.Message) {
 	cb, ok := c.eventHandler(msg.Route)
 	if !ok {
-		log.Println("event handler not found", msg.Route, msg, c.events)
+		log.Printf(fmt.Sprintf("[%s] event handler not found. route: %s , msg: %s ", c.uid, msg.Route, msg))
 		return
 	}
 
-	threading.GoSafe(func() {
+	go func() {
+
+		defer func() {
+			if p := recover(); p != nil {
+				log.Println(fmt.Sprintf("[%s] event failed recover, %s", c.uid, p))
+			}
+		}()
+
 		cb(string(msg.Data))
-	})
+
+	}()
+
 }

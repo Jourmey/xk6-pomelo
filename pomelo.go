@@ -82,7 +82,7 @@ func (mi *Instance) Connect(args goja.Value) (response *ConnectResponse, err err
 
 	//parsedArgs.tagsAndMeta.SetSystemTagOrMetaIfEnabled(state.Options.SystemTags, metrics.TagURL, url)
 
-	connector := pomelosdk.NewConnector()
+	connector := pomelosdk.NewConnector(parsedArgs.uid)
 
 	cl := &Client{
 		vu:      mi.vu,

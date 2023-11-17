@@ -6,4 +6,6 @@
 
 /Users/zhengjm/ztproduct/bin/xk6  build --with github.com/Jourmey/xk6-pomelo
 
+/Users/zhengjm/ztproduct/bin/xk6  build --with github.com/Jourmey/xk6-pomelo=.
+
 ```

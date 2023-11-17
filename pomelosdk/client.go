@@ -9,8 +9,9 @@ import (
 type Callback func(data string)
 
 // NewConnector create a new Connector
-func NewConnector() *Connector {
+func NewConnector(uid string) *Connector {
 	return &Connector{
+		uid:    uid,
 		die:    make(chan byte),
 		codec:  codec.NewDecoder(),
 		chSend: make(chan []byte, 64),
